@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "algorithms": [
+    { "id": 1, "name": "ML-DSA-44", "provider": "OpenSSL", "evp_name": "ML-DSA-44" },
+    { "id": 2, "name": "ML-DSA-65", "provider": "OpenSSL", "evp_name": "ML-DSA-65" },
+    { "id": 3, "name": "ML-DSA-87", "provider": "OpenSSL", "evp_name": "ML-DSA-87" },
+    { "id": 4, "name": "Falcon-512", "provider": "liboqs", "oqs_name": "Falcon-512" },
+    { "id": 5, "name": "Falcon-1024", "provider": "liboqs", "oqs_name": "Falcon-1024" },
+    {
+      "id": 6,
+      "name": "RSASSA-PSS",
+      "provider": "OpenSSL",
+      "parameters": {
+        "rsa_bits": 3072,
+        "public_exponent": 65537,
+        "digest": "SHA-256",
+        "mgf1_digest": "SHA-256",
+        "salt_length_bytes": 32,
+        "public_key_encoding": "DER SubjectPublicKeyInfo"
+      }
+    },
+    { "id": 7, "name": "Ed25519", "provider": "OpenSSL", "evp_name": "ED25519" }
+  ]
+}

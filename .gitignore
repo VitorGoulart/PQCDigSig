@@ -1,0 +1,85 @@
+# Codex and local project context
+.context/
+.codex/
+.agents/
+
+# CMake and native build artifacts
+build/
+out/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+compile_commands.json
+install_manifest.txt
+CTestTestfile.cmake
+Testing/
+*.ninja
+.ninja_deps
+.ninja_log
+Makefile
+
+# Compiled native files
+*.o
+*.obj
+*.a
+*.so
+*.dylib
+*.dll
+*.exe
+*.out
+*.dSYM/
+
+# Android and Gradle
+.gradle/
+**/build/
+local.properties
+captures/
+.cxx/
+*.apk
+*.aab
+*.ap_
+*.dex
+*.hprof
+
+# IDEs and editors
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+*~
+
+# Third-party build and installation artifacts
+third_party/build/
+third_party/install/
+
+# Experimental outputs
+results/raw/
+results/merged/
+results/summaries/
+results/figures/
+results/metadata/
+
+# Generated datasets
+datasets/payloads/
+
+# Logs, temporary files and crash dumps
+*.log
+*.tmp
+*.temp
+*.pid
+core.*
+
+# Python analysis tools
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Operating-system metadata
+.DS_Store
+Thumbs.db

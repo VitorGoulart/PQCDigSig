@@ -1,0 +1,7 @@
+{
+  "schema_version": 1,
+  "bind_address": "0.0.0.0",
+  "port": 9000,
+  "max_body_bytes": 2097152,
+  "max_runs_per_connection": 1000
+}
