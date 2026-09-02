@@ -5,6 +5,7 @@ add_library(
     src/benchmark/payload_generator.cpp
     src/benchmark/timer.cpp
     src/crypto/algorithm_factory.cpp
+    src/crypto/crypto_error.cpp
     src/crypto/openssl/ed25519.cpp
     src/crypto/openssl/ml_dsa.cpp
     src/crypto/openssl/openssl_helpers.cpp
@@ -16,8 +17,11 @@ add_library(
     src/network/socket_io.cpp
     src/protocol/decoder.cpp
     src/protocol/encoder.cpp
+    src/protocol/messages.cpp
     src/protocol/protocol_error.cpp
+    src/protocol/protocol_validation.cpp
     src/protocol/signed_content.cpp
+    src/protocol/state_machine.cpp
     src/results/csv_writer.cpp
     src/results/metadata.cpp
 )
