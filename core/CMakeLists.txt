@@ -3,6 +3,7 @@ add_library(
     STATIC
     src/benchmark/experiment_runner.cpp
     src/benchmark/payload_generator.cpp
+    src/benchmark/run_config.cpp
     src/benchmark/timer.cpp
     src/crypto/algorithm_factory.cpp
     src/crypto/crypto_error.cpp
@@ -24,6 +25,7 @@ add_library(
     src/protocol/state_machine.cpp
     src/results/csv_writer.cpp
     src/results/metadata.cpp
+    src/results/result_writer.cpp
 )
 
 add_library(tcc::core ALIAS tcc_core)

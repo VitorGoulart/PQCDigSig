@@ -23,14 +23,46 @@ algoritmo ou o tamanho muda.
 As cargas são binárias e pseudoaleatórias, geradas fora das regiões
 temporizadas. Em cada repetição, todos os algoritmos recebem exatamente os
 mesmos bytes para um dado tamanho. Uma semente registrada em hexadecimal no
-JSON permite reproduzi-las. A geração pode derivar a semente específica por
-`SHA-256(experiment_id || repetition || payload_size)`.
+JSON permite reproduzi-las. A implementação deriva uma semente específica para
+cada combinação de experimento, repetição e tamanho.
+
+A construção implementada usa uma semente mestre de exatamente 32 bytes,
+registrada como 64 dígitos hexadecimais. Para cada cenário, deriva-se:
+
+```text
+scenario_seed = SHA-256(master_seed || experiment_id_be32 ||
+                       repetition_be32 || payload_size_be32)
+payload = SHAKE-256("TCC-PAYLOAD-v1" || scenario_seed, payload_size)
+```
+
+Os inteiros são sem sinal e codificados em *big-endian*. A cadeia ASCII fixa
+oferece separação de domínio e o sufixo `v1` congela esta versão do gerador. O
+algoritmo não recebe o ID da assinatura: dentro da mesma repetição, todos os
+algoritmos usam necessariamente a mesma carga para a combinação de experimento
+e tamanho. Somente os tamanhos normativos de 10 KiB, 100 KiB e 1 MiB são
+aceitos.
 
 ## Temporização
 
 Usa-se relógio monotônico de alta resolução. A duração é armazenada como número
 inteiro de nanossegundos. Serialização, rede, alocação da carga, gravação em
 disco e atualização de interface ficam fora das regiões temporizadas.
+
+Cada intervalo cobre a chamada pública completa do adaptador criptográfico. Em
+`generate_key_pair`, isso inclui a geração pelo provedor e a exportação das
+chaves para a representação binária compartilhada. Em `sign` e `verify`, inclui
+a importação da chave binária, a criação/configuração do contexto do provedor e
+a operação de assinatura ou verificação. Essa escolha mede o custo efetivamente
+observado pelo núcleo comum e deve ser mantida idêntica nos dois dispositivos.
+"Serialização" no parágrafo anterior significa a codificação do protocolo e do
+CSV/JSON; a conversão de chave feita internamente pelo adaptador faz parte da
+operação medida.
+
+A carga e o conteúdo canônico assinado são preparados antes de iniciar o
+cronômetro. A medição termina antes da construção da mensagem de transporte. A
+recepção é concluída e o conteúdo canônico de entrada é reconstruído antes da
+medição de verificação. Assim, enquadramento, cópias do protocolo e I/O TCP não
+contaminam as três métricas.
 
 ## Falhas
 
@@ -143,3 +175,20 @@ Cliente e servidor usam o mesmo `experiment_id`, recebido em `START_RUN`, e o
 mesmo `run_id` e `iteration`. A consolidação correlaciona os arquivos por
 `experiment_id + run_id + iteration`; `side` e `operation` distinguem as seis
 medições.
+
+## Implementação dos gravadores
+
+O gravador CSV cria um arquivo novo, escreve exatamente o cabeçalho normativo e
+valida identificadores, iteração, lado, algoritmo, carga, operação e duração
+antes de cada linha. Números usam a localidade clássica e as linhas terminam em
+LF. Escrita e `flush` com falha produzem erro tipado; o contador de linhas só é
+incrementado depois de uma gravação bem-sucedida.
+
+O serializador JSON valida o esquema fixo, a semente, a matriz de cargas, a
+ordem randomizada, IDs únicos de *run*, repetição, provedor do algoritmo e os
+campos de falha. Uma *run* `completed` não pode conter erro; uma *run* `aborted`
+deve conter um código do protocolo. Strings são escapadas de acordo com JSON e
+nenhuma duração é aceita pelo modelo de metadados. A implementação também
+fornece horário UTC RFC 3339 e coleta, a partir do binário, versões do OpenSSL,
+liboqs e compilador; as demais informações de ambiente continuam sendo
+preenchidas pelas aplicações de cada dispositivo.

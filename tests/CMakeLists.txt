@@ -37,3 +37,18 @@ tcc_add_protocol_test(
     crypto_signature_algorithm_test
     unit/crypto/signature_algorithm_test.cpp
 )
+
+tcc_add_protocol_test(
+    benchmark_experiment_runner_test
+    unit/benchmark/experiment_runner_test.cpp
+)
+
+tcc_add_protocol_test(
+    benchmark_payload_generator_test
+    unit/benchmark/payload_generator_test.cpp
+)
+
+tcc_add_protocol_test(
+    results_writer_test
+    unit/results/result_writer_test.cpp
+)
