@@ -1,54 +1,23 @@
-function(tcc_add_protocol_test test_name source_file)
-    add_executable(${test_name} ${source_file})
-    target_link_libraries(${test_name} PRIVATE tcc::core)
-    target_compile_features(${test_name} PRIVATE cxx_std_17)
-    add_test(NAME ${test_name} COMMAND ${test_name})
-endfunction()
+add_executable(payload_test payload_test.cpp)
+target_link_libraries(payload_test PRIVATE tcc::native)
+add_test(NAME payload_test COMMAND payload_test)
 
-tcc_add_protocol_test(
-    protocol_encoder_test
-    unit/protocol/encoder_test.cpp
-)
-tcc_add_protocol_test(
-    protocol_decoder_test
-    unit/protocol/decoder_test.cpp
-)
-tcc_add_protocol_test(
-    protocol_malformed_message_test
-    unit/protocol/malformed_message_test.cpp
-)
-tcc_add_protocol_test(
-    protocol_signed_content_test
-    unit/protocol/signed_content_test.cpp
-)
-tcc_add_protocol_test(
-    protocol_state_machine_test
-    unit/protocol/state_machine_test.cpp
-)
+add_executable(crypto_structures_test crypto_structures_test.cpp)
+target_link_libraries(crypto_structures_test PRIVATE tcc::native)
+add_test(NAME crypto_structures_test COMMAND crypto_structures_test)
 
-find_package(Threads REQUIRED)
-tcc_add_protocol_test(
-    network_socket_io_test
-    unit/network/socket_io_test.cpp
-)
-target_link_libraries(network_socket_io_test PRIVATE Threads::Threads)
+add_executable(crypto_adapters_test crypto_adapters_test.cpp)
+target_link_libraries(crypto_adapters_test PRIVATE tcc::native)
+add_test(NAME crypto_adapters_test COMMAND crypto_adapters_test)
 
-tcc_add_protocol_test(
-    crypto_signature_algorithm_test
-    unit/crypto/signature_algorithm_test.cpp
-)
+add_executable(measurement_test measurement_test.cpp)
+target_link_libraries(measurement_test PRIVATE tcc::native)
+add_test(NAME measurement_test COMMAND measurement_test)
 
-tcc_add_protocol_test(
-    benchmark_experiment_runner_test
-    unit/benchmark/experiment_runner_test.cpp
-)
+add_executable(transport_test transport_test.cpp)
+target_link_libraries(transport_test PRIVATE tcc::native)
+add_test(NAME transport_test COMMAND transport_test)
 
-tcc_add_protocol_test(
-    benchmark_payload_generator_test
-    unit/benchmark/payload_generator_test.cpp
-)
-
-tcc_add_protocol_test(
-    results_writer_test
-    unit/results/result_writer_test.cpp
-)
+add_executable(csv_test csv_test.cpp)
+target_link_libraries(csv_test PRIVATE tcc::native)
+add_test(NAME csv_test COMMAND csv_test)

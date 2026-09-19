@@ -1,18 +1,18 @@
 plugins {
     id("com.android.application")
-    kotlin("android")
 }
 
 android {
     namespace = "br.edu.tcc"
-    compileSdk = 37
+    compileSdk = 36
+    ndkVersion = "30.0.15729638"
 
     defaultConfig {
-        applicationId = "br.edu.tcc"
-        minSdk = 26
-        targetSdk = 37
+        applicationId = "br.edu.tcc.client"
+        minSdk = 29
+        targetSdk = 36
         versionCode = 1
-        versionName = "0.1.0"
+        versionName = "1.0"
 
         ndk {
             abiFilters += "arm64-v8a"
@@ -20,13 +20,37 @@ android {
 
         externalNativeBuild {
             cmake {
-                cppFlags += listOf("-std=c++17")
-                arguments += listOf(
-                    "-DTCC_LIBOQS_ANDROID_ROOT=${rootProject.projectDir}/../third_party/install/liboqs-android",
-                    "-DTCC_OPENSSL_ANDROID_ROOT=${rootProject.projectDir}/../third_party/install/openssl-android"
-                )
+                cppFlags += "-std=c++17"
             }
         }
+    }
+
+    flavorDimensions += "client"
+    productFlavors {
+        create("clientAndroid16") {
+            dimension = "client"
+            applicationIdSuffix = ".android16"
+            minSdk = 36
+            buildConfigField("String", "CLIENT_NAME", "\"clientAndroid16\"")
+        }
+        create("clientAndroid10") {
+            dimension = "client"
+            applicationIdSuffix = ".android10"
+            minSdk = 29
+            buildConfigField("String", "CLIENT_NAME", "\"clientAndroid10\"")
+        }
+    }
+
+    buildTypes {
+        getByName("debug") {
+            ndk {
+                abiFilters += "x86_64"
+            }
+        }
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     externalNativeBuild {
@@ -39,9 +63,5 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-    }
-
-    kotlinOptions {
-        jvmTarget = "17"
     }
 }

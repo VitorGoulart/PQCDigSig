@@ -2,70 +2,104 @@
 
 set -euo pipefail
 
-script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-project_root="$(cd -- "${script_dir}/.." && pwd)"
-liboqs_source="${project_root}/third_party/liboqs"
-target="${1:-}"
-abi="${2:-arm64-v8a}"
-algorithms="SIG_falcon_512;SIG_falcon_1024"
+readonly script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+readonly project_root="$(cd -- "${script_dir}/.." && pwd)"
+readonly source_dir="${project_root}/third_party/liboqs"
+readonly dependencies_dir="${TCC_DEPENDENCIES_DIR:-${project_root}/build/dependencies}"
+readonly minimum_android_api=29
+readonly target="${1:-}"
+readonly android_abi="${2:-arm64-v8a}"
+readonly algorithms="SIG_falcon_512;SIG_falcon_1024"
 
-if [[ ! -f "${liboqs_source}/CMakeLists.txt" ]]; then
-    echo "liboqs is unavailable. Run: git submodule update --init --recursive" >&2
+usage() {
+    echo "Usage: $0 <linux|android> [android-abi]" >&2
+}
+
+require_command() {
+    if ! command -v "$1" >/dev/null 2>&1; then
+        echo "Required command not found: $1" >&2
+        exit 1
+    fi
+}
+
+find_android_ndk() {
+    local candidate="${ANDROID_NDK_HOME:-${ANDROID_NDK_ROOT:-}}"
+
+    if [[ -z "${candidate}" && -n "${ANDROID_HOME:-}" ]]; then
+        candidate="${ANDROID_HOME}/ndk/30.0.15729638"
+    fi
+
+    if [[ ! -f "${candidate}/build/cmake/android.toolchain.cmake" ]]; then
+        echo "Android NDK not found. Set ANDROID_NDK_HOME or ANDROID_NDK_ROOT." >&2
+        exit 1
+    fi
+
+    echo "${candidate}"
+}
+
+if [[ ! -f "${source_dir}/CMakeLists.txt" ]]; then
+    echo "liboqs sources not found. Initialize the third_party/liboqs submodule." >&2
     exit 1
 fi
 
-common_args=(
-    -G Ninja
-    -DCMAKE_BUILD_TYPE=Release
-    -DBUILD_SHARED_LIBS=OFF
-    -DOQS_BUILD_ONLY_LIB=ON
-    -DOQS_USE_OPENSSL=OFF
-    "-DOQS_MINIMAL_BUILD=${algorithms}"
-)
+require_command cmake
+require_command ninja
+
+build_dir=""
+install_dir=""
+platform_args=()
 
 case "${target}" in
     linux)
-        build_dir="${project_root}/third_party/build/liboqs-linux"
-        install_dir="${project_root}/third_party/install/liboqs-linux"
-
-        cmake -S "${liboqs_source}" -B "${build_dir}" \
-            "${common_args[@]}" \
-            -DCMAKE_C_COMPILER=clang \
-            -DCMAKE_INSTALL_PREFIX="${install_dir}"
+        require_command clang
+        build_dir="${dependencies_dir}/work/liboqs-linux"
+        install_dir="${dependencies_dir}/linux/liboqs"
+        platform_args+=("-DCMAKE_C_COMPILER=${TCC_LINUX_CC:-clang}")
         ;;
     android)
-        android_sdk="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
-        android_ndk="${ANDROID_NDK_HOME:-${ANDROID_NDK_ROOT:-}}"
+        readonly android_ndk="$(find_android_ndk)"
 
-        if [[ ! -f "${android_ndk}/build/cmake/android.toolchain.cmake" && -n "${android_sdk}" ]]; then
-            latest_ndk="$(find "${android_sdk}/ndk" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' 2>/dev/null | sort -V | tail -n 1)"
-            if [[ -n "${latest_ndk}" ]]; then
-                android_ndk="${android_sdk}/ndk/${latest_ndk}"
-            fi
-        fi
+        case "${android_abi}" in
+            arm64-v8a|x86_64)
+                ;;
+            *)
+                echo "Unsupported Android ABI: ${android_abi}" >&2
+                echo "Supported ABIs: arm64-v8a, x86_64" >&2
+                exit 2
+                ;;
+        esac
 
-        if [[ ! -f "${android_ndk}/build/cmake/android.toolchain.cmake" ]]; then
-            echo "Android NDK not found. Set ANDROID_NDK_HOME or ANDROID_NDK_ROOT." >&2
-            exit 1
-        fi
-
-        build_dir="${project_root}/third_party/build/liboqs-android-${abi}"
-        install_dir="${project_root}/third_party/install/liboqs-android/${abi}"
-
-        cmake -S "${liboqs_source}" -B "${build_dir}" \
-            "${common_args[@]}" \
-            -DCMAKE_TOOLCHAIN_FILE="${android_ndk}/build/cmake/android.toolchain.cmake" \
-            -DANDROID_ABI="${abi}" \
-            -DANDROID_PLATFORM=android-26 \
-            -DCMAKE_INSTALL_PREFIX="${install_dir}"
+        build_dir="${dependencies_dir}/work/liboqs-android-${android_abi}"
+        install_dir="${dependencies_dir}/android/${android_abi}/liboqs"
+        platform_args+=(
+            "-DCMAKE_TOOLCHAIN_FILE=${android_ndk}/build/cmake/android.toolchain.cmake"
+            "-DANDROID_ABI=${android_abi}"
+            "-DANDROID_PLATFORM=android-${minimum_android_api}"
+        )
         ;;
     *)
-        echo "Usage: $0 <linux|android> [android-abi]" >&2
+        usage
         exit 2
         ;;
 esac
 
+cmake -S "${source_dir}" -B "${build_dir}" \
+    -G Ninja \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX="${install_dir}" \
+    -DCMAKE_INSTALL_LIBDIR=lib \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DOQS_BUILD_ONLY_LIB=ON \
+    -DOQS_USE_OPENSSL=OFF \
+    "-DOQS_MINIMAL_BUILD=${algorithms}" \
+    "${platform_args[@]}"
+
 cmake --build "${build_dir}" --parallel
 cmake --install "${build_dir}"
+
+if [[ ! -f "${install_dir}/lib/liboqs.a" ]]; then
+    echo "liboqs build finished without the expected lib/liboqs.a artifact." >&2
+    exit 1
+fi
 
 echo "liboqs installed in ${install_dir}"
