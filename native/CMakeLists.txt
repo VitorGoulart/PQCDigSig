@@ -77,6 +77,7 @@ find_package(
 )
 
 add_library(tcc_native STATIC
+    src/client.cpp
     src/csv.cpp
     src/crypto.cpp
     src/crypto/ed25519.cpp

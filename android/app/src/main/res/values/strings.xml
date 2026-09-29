@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">TCC Client</string>
-    <string name="status_text">%1$s\nNúcleo: %2$s</string>
+    <string name="experiment_status">%1$d / %2$d\n%3$s\n%4$s</string>
+    <string name="csv_filename">CSV: %1$s</string>
 </resources>

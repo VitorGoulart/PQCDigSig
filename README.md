@@ -36,10 +36,10 @@ gerado fica sob `build/` e não é versionado.
 
 Os mesmos scripts possuem o alvo `android`, preparado para API mínima 29 e
 para as ABIs `arm64-v8a` e `x86_64`. Os artefatos para ambas as ABIs foram
-gerados em `build/dependencies/android/<ABI>/`; `arm64-v8a` corresponde ao
-aparelho físico já confirmado e `x86_64` atende aos emuladores auxiliares. O
-diretório de saída pode ser alterado com `TCC_DEPENDENCIES_DIR`, e o
-paralelismo com `TCC_BUILD_JOBS`.
+gerados em `build/dependencies/android/<ABI>/`; `arm64-v8a` corresponde aos
+dois aparelhos físicos confirmados e `x86_64` atende aos emuladores
+auxiliares. O diretório de saída pode ser alterado com
+`TCC_DEPENDENCIES_DIR`, e o paralelismo com `TCC_BUILD_JOBS`.
 
 A compilação Linux foi validada com Clang 21.1.8. Um teste de ligação e
 execução confirmou a disponibilidade de ML-DSA-44/65/87, RSA-PSS e Ed25519
@@ -207,6 +207,120 @@ O gerador C++ produz cada carga preenchendo todos os bytes com o valor fixo
 - Com `N` repetições, a execução completa possui `7 × 3 × N = 21N`
   repetições; com o padrão `N = 30`, são 630.
 
+### Servidor Linux
+
+Compile o servidor e os testes com o preset Linux:
+
+```bash
+cmake --preset linux-debug
+cmake --build --preset linux-debug
+ctest --preset linux-debug
+```
+
+O executável é gerado em `build/linux-debug/server/tcc_server`. Ele escuta em
+`0.0.0.0:62037`, aceita uma conexão por repetição e percorre primeiro os três
+tamanhos de carga e, dentro de cada tamanho, os sete algoritmos na ordem fixa.
+O código reutilizável fica em `tcc_server_lib`: `config.cpp` trata a linha de
+comando e `server.cpp` contém o socket de escuta e o laço experimental. O
+`main.cpp` limita-se a coordenar essas partes e traduzir falhas em códigos de
+saída.
+
+As opções disponíveis são:
+
+```bash
+./build/linux-debug/server/tcc_server \
+  --repetitions 30 \
+  --client clientAndroid16 \
+  --output server_measurements.csv
+```
+
+`--repetitions` usa 30 por padrão. `--client` define o identificador registrado
+no CSV e usa `unspecified` quando omitido; `--output` seleciona o arquivo de
+medições. Use `--help` para consultar essas opções sem iniciar a escuta. O
+valor padrão de cliente serve apenas ao desenvolvimento; uma coleta real deve
+informar explicitamente `clientAndroid16` ou `clientAndroid10`.
+
+Para cada conexão, o servidor recebe carga, chave pública e assinatura, mede a
+verificação e, se ela for válida, mede a geração de um novo par de chaves e a
+assinatura da resposta. A transmissão e a gravação permanecem fora das regiões
+temporizadas. Três linhas são gravadas e descarregadas no CSV ao fim de cada
+tentativa. Operações não alcançadas por causa de uma falha são registradas com
+`status=failure` e duração zero, portanto devem ser excluídas das amostras de
+desempenho.
+
+`server_config_test` cobre os padrões, todas as opções e entradas inválidas. A
+suíte Linux da etapa do servidor possuía sete testes, e um teste de fumaça
+adicional confirmou o `bind` em `0.0.0.0:62037`. A integração foi validada
+posteriormente em emulador Android 16 e nos dois aparelhos físicos, conforme
+a seção abaixo.
+
+## Cliente Android — primeira implementação funcional
+
+O aplicativo agora oferece endereço IPv4 do servidor, quantidade de repetições
+(30 por padrão), início, progresso, cancelamento e exportação do CSV. O fluxo
+foi implementado a partir do `clientAndroid16`, mantendo Kotlin/JNI e executor
+C++ compartilhados com `clientAndroid10`.
+
+`native/src/client.cpp` executa a matriz de `21N` tentativas na mesma ordem do
+servidor, com uma conexão TCP por tentativa. A JNI executa em uma thread de
+trabalho; geração de chaves, assinatura e verificação são medidas separadamente
+pelas funções existentes. Rede, persistência e interface ficam fora dos tempos
+criptográficos. O CSV é gravado incrementalmente no armazenamento privado,
+com três linhas por tentativa, e pode ser exportado após conclusão, erro ou
+cancelamento.
+
+Para compilar as duas variantes e verificar o Android 16:
+
+```bash
+source android-env.sh
+cd android
+./gradlew :app:assembleClientAndroid16Debug :app:assembleClientAndroid10Debug \
+  :app:lintClientAndroid16Debug
+```
+
+O APK principal fica em
+`android/app/build/outputs/apk/clientAndroid16/debug/app-clientAndroid16-debug.apk`.
+Para um piloto, inicie o servidor com `--repetitions 1 --client clientAndroid16`,
+informe seu IPv4 no aplicativo (`10.0.2.2` no emulador padrão) e selecione `1`
+repetição. O resultado esperado é `21 / 21`, com 63 medições por lado.
+
+O cliente encerra a execução no primeiro erro, pois o transporte sem negociação
+não permite ressincronizar uma conexão perdida. Após erro ou cancelamento,
+reinicie o servidor antes de outra matriz. Operações não alcançadas ficam com
+duração zero e `status=failure`; repetições incompletas devem ser excluídas da
+análise. Mantenha o aplicativo em primeiro plano durante a coleta. O executor
+sobrevive à recriação da Activity, mas não retoma uma execução após o processo
+ser encerrado pelo sistema.
+
+Em 22 de setembro de 2026:
+
+- a suíte Linux concluiu **8/8 testes**, incluindo matriz cliente-servidor com
+  `N=2`, validação dos CSVs, resposta adulterada, conexão recusada e cancelamento;
+- as duas variantes debug compilaram para `arm64-v8a` e `x86_64`; o lint Android
+  16 terminou sem erros;
+- o piloto no emulador Android 16 concluiu **21/21 tentativas sem falhas**,
+  produzindo **63 medições válidas em cada lado**, com correlação conferida;
+- o cancelamento pela interface preservou o CSV parcial e liberou os controles.
+
+Também em 22 de setembro de 2026, após a instalação dos APKs nos aparelhos
+físicos, o usuário confirmou que ambos os clientes se conectaram ao servidor
+Linux desta máquina, realizaram a comunicação e exportaram seus arquivos CSV:
+
+| Cliente | Aparelho | Conexão e comunicação | Exportação CSV |
+| --- | --- | --- | --- |
+| `clientAndroid16` | Samsung SM-A556E, Android 16/API 36 | Sucesso confirmado pelo usuário | Sucesso confirmado pelo usuário |
+| `clientAndroid10` | Xiaomi Redmi Note 8, Android 10/API 29 | Sucesso confirmado pelo usuário | Sucesso confirmado pelo usuário |
+
+Esse registro conclui a validação funcional de comunicação e exportação nos
+dois aparelhos, incluindo a exportação que o seletor simulado do AVD
+`aosp_atd` não permitia testar. A quantidade de repetições e o conteúdo dos
+CSVs dessas execuções físicas não foram informados neste relato; a conferência
+da matriz e a coleta final de desempenho permanecem pendentes. Os tempos do
+emulador não são resultados de desempenho.
+
+A revisão da base, os arquivos modificados, as decisões, a reprodução do piloto
+e as limitações estão em [docs/android-client.md](docs/android-client.md).
+
 ## Configuração Android local
 
 Carregue as variáveis da sessão com:
@@ -224,12 +338,14 @@ físicos correspondentes.
 
 ### Dispositivos físicos confirmados
 
-Informações consultadas por ADB em 17 de setembro de 2026:
+Informações consultadas por ADB em 17 de setembro de 2026 para o
+`clientAndroid16` e em 20 de setembro de 2026 para o `clientAndroid10`:
 
 | Cliente | Fabricante | Modelo | Android/API | ABI principal | ABIs suportadas | Hardware/plataforma | Patch de segurança |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `clientAndroid16` | Samsung | SM-A556E | 16/36 | `arm64-v8a` | `arm64-v8a` (somente 64 bits) | `s5e8845`/`erd8845` | 2026-07-05 |
+| `clientAndroid10` | Xiaomi | Redmi Note 8 | 10/29 | `arm64-v8a` | `arm64-v8a`, `armeabi-v7a`, `armeabi` | `qcom`/`trinket` | 2021-02-01 |
 
-O número de série retornado pelo ADB não é registrado, pois não é
-necessário para reproduzir a compilação. Para esse aparelho, as dependências
-nativas e o aplicativo devem ser compilados para `arm64-v8a`.
+Os números de série retornados pelo ADB não são registrados, pois não são
+necessários para reproduzir a compilação. Para ambos os aparelhos, as
+dependências nativas e o aplicativo devem ser compilados para `arm64-v8a`.
