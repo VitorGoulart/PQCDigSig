@@ -10,6 +10,8 @@ import java.util.concurrent.Executors
 /** Process-scoped worker: survives Activity recreation without retaining a screen. */
 object ExperimentController {
     data class State(
+        val ready: Boolean = false,
+        val preparing: Boolean = false,
         val running: Boolean = false,
         val cancelling: Boolean = false,
         val completed: Long = 0,
@@ -34,20 +36,43 @@ object ExperimentController {
     }
 
     fun restore(context: Context) {
-        if (state.csv != null || state.running) return
-        val preferences = context.getSharedPreferences("experiment", Context.MODE_PRIVATE)
-        host = preferences.getString("host", "") ?: ""
-        repetitions = preferences.getString("repetitions", "30") ?: "30"
-        val name = preferences.getString("csv", null) ?: return
-        val file = File(context.filesDir, "measurements/$name")
-        if (file.isFile) publish(State(
-            csv = file,
-            message = "CSV anterior disponível. Uma execução interrompida pelo sistema não é retomada; reinicie o servidor antes de iniciar.",
-        ))
+        if (state.csv == null && !state.running) {
+            val preferences = context.getSharedPreferences("experiment", Context.MODE_PRIVATE)
+            host = preferences.getString("host", "") ?: ""
+            repetitions = preferences.getString("repetitions", "30") ?: "30"
+            val name = preferences.getString("csv", null)
+            val file = name?.let { File(context.filesDir, "measurements/$it") }
+            if (file?.isFile == true) publish(state.copy(
+                csv = file,
+                message = "CSV anterior disponível. Uma execução interrompida pelo sistema não é retomada; reinicie o servidor antes de iniciar.",
+            ))
+        }
+        prepare()
+    }
+
+    private fun prepare() {
+        if (state.ready || state.preparing || state.running) return
+        val readyMessage = state.message
+        publish(state.copy(preparing = true, message = "Preparando experimento…"))
+        worker.execute {
+            val failure = try {
+                NativeBridge.initializeCrypto()
+                null
+            } catch (error: Exception) {
+                "Não foi possível preparar o experimento: ${error.message}"
+            } catch (error: LinkageError) {
+                "Não foi possível carregar o experimento: ${error.message}"
+            }
+            main.post {
+                publish(state.copy(ready = failure == null, preparing = false,
+                    message = failure ?: readyMessage))
+            }
+        }
     }
 
     fun start(context: Context, address: String, count: Int) {
         if (state.running) return
+        check(state.ready) { "Aguarde a preparação do experimento." }
         val directory = File(context.filesDir, "measurements")
         check(directory.isDirectory || directory.mkdirs()) { "Não foi possível criar a pasta de resultados." }
         val file = File(directory, "${BuildConfig.CLIENT_NAME}-${UUID.randomUUID()}.csv")
@@ -57,7 +82,7 @@ object ExperimentController {
         context.getSharedPreferences("experiment", Context.MODE_PRIVATE).edit()
             .putString("host", host).putString("repetitions", repetitions)
             .putString("csv", file.name).apply()
-        publish(State(running = true, total = 21L * count, message = "Iniciando…", csv = file))
+        publish(State(ready = true, running = true, total = 21L * count, message = "Iniciando…", csv = file))
         worker.execute {
             val message = try {
                 NativeBridge.run(handle, address, count, BuildConfig.CLIENT_NAME, file.absolutePath,

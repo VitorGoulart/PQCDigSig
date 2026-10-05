@@ -145,7 +145,7 @@ class MainActivity : Activity() {
     private fun render(state: ExperimentController.State) {
         host.isEnabled = !state.running
         repetitions.isEnabled = !state.running
-        start.isEnabled = !state.running
+        start.isEnabled = state.ready && !state.running
         cancel.isEnabled = state.running && !state.cancelling
         export.isEnabled = !state.running && state.csv?.isFile == true
         progress.progress = if (state.total == 0L) 0 else (state.completed * 1000 / state.total).toInt()

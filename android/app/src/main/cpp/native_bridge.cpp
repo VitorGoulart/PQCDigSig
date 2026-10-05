@@ -1,6 +1,7 @@
 #include <jni.h>
 
 #include "tcc/client.hpp"
+#include "tcc/crypto/runtime.hpp"
 
 #include <memory>
 #include <stdexcept>
@@ -32,6 +33,15 @@ Java_br_edu_tcc_NativeBridge_create(JNIEnv* env, jobject) {
     } catch (const std::exception& error) {
         throw_java(env, error);
         return 0;
+    }
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_br_edu_tcc_NativeBridge_initializeCrypto(JNIEnv* env, jobject) {
+    try {
+        tcc::initialize_crypto_runtime();
+    } catch (const std::exception& error) {
+        throw_java(env, error);
     }
 }
 

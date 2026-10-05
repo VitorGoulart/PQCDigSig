@@ -7,6 +7,7 @@ object NativeBridge {
         fun onProgress(completed: Long, total: Long, detail: String)
     }
 
+    external fun initializeCrypto()
     external fun create(): Long
     external fun cancel(handle: Long)
     external fun destroy(handle: Long)

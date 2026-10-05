@@ -109,6 +109,21 @@ criptográfico; geração da carga, metadados, comunicação e persistência fic
 cargo do executor e fora da região temporizada. Erros dos adaptadores não são
 ocultados e continuam sendo propagados como `CryptoError`.
 
+Antes das amostras, `tcc::initialize_crypto_runtime()` prepara o OpenSSL,
+mantém o provider `default` e as implementações criptográficas disponíveis,
+inicializa os geradores aleatórios da thread e chama `OQS_init()` para
+antecipar a detecção de recursos da CPU. A API está em
+`tcc/crypto/runtime.hpp` e deve ser chamada na thread das medições. Ela pode
+ser chamada novamente sem gerar chaves, assinaturas ou amostras de aquecimento.
+O servidor conclui essa preparação antes de escutar; o Android a executa ao
+abrir a tela, no mesmo executor do experimento, antes de habilitar o início.
+O executor C++ do cliente também a chama para atender outros consumidores.
+
+Os cronômetros continuam abrangendo a chamada completa ao adaptador. Criação
+de contextos, alocação de buffers e importação/exportação de chaves continuam
+nesse intervalo; a preparação antecipa os custos compartilhados e por thread,
+sem eliminar todos os efeitos da primeira execução.
+
 Em 19 de setembro de 2026, `measurement_test` percorreu os sete algoritmos,
 validando resultados e durações independentes para geração de chaves,
 assinatura, verificação válida e rejeição de carga alterada. A suíte Linux

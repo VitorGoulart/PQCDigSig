@@ -86,6 +86,7 @@ add_library(tcc_native STATIC
     src/crypto/ml_dsa.cpp
     src/crypto/openssl_helpers.cpp
     src/crypto/rsa_pss.cpp
+    src/crypto/runtime.cpp
     src/measurement.cpp
     src/payload.cpp
     src/transport.cpp

@@ -1,5 +1,6 @@
 #include "tcc/client.hpp"
 
+#include "tcc/crypto/runtime.hpp"
 #include "tcc/csv.hpp"
 #include "tcc/payload.hpp"
 #include "tcc/transport.hpp"
@@ -109,6 +110,7 @@ Summary run(const Config& config, Control& control,
     if (config.repetitions == 0 || config.client.empty() || config.output_path.empty())
         throw std::invalid_argument("Configuração do cliente inválida.");
 
+    initialize_crypto_runtime();
     MeasurementCsvWriter writer(config.output_path);
     Summary summary;
     const std::uint64_t total = 21ULL * config.repetitions;

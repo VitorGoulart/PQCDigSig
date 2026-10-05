@@ -2,6 +2,7 @@
 #include "tcc/timer.hpp"
 
 #include <exception>
+#include <future>
 #include <iostream>
 #include <memory>
 #include <stdexcept>
@@ -14,6 +15,38 @@ void expect(const bool condition, const std::string_view message) {
     if (!condition) {
         throw std::runtime_error(std::string(message));
     }
+}
+
+void exercise_runtime_initialization() {
+    std::promise<void> begin;
+    const auto start = begin.get_future().share();
+    const auto prepare_and_sign = [start] {
+        start.wait();
+        tcc::initialize_crypto_runtime();
+        tcc::initialize_crypto_runtime();
+        const auto algorithm =
+            tcc::create_signature_algorithm(tcc::Algorithm::ed25519);
+        const auto keys = algorithm->generate_key_pair();
+        const tcc::Bytes payload{'r', 'u', 'n', 't', 'i', 'm', 'e'};
+        const auto signature = algorithm->sign(payload, keys.private_key);
+        tcc::initialize_crypto_runtime();
+        expect(algorithm->verify(payload, signature, keys.public_key),
+               "repeated initialization invalidated a signature");
+        auto altered = payload;
+        altered.front() ^= 0x01U;
+        expect(!algorithm->verify(altered, signature, keys.public_key),
+               "initialized worker accepted altered data");
+        return keys.public_key;
+    };
+    auto first = std::async(std::launch::async, prepare_and_sign);
+    auto second = std::async(std::launch::async, prepare_and_sign);
+    begin.set_value();
+    expect(first.get() != second.get(),
+           "independent workers generated the same key");
+
+    // A new measuring thread must also prepare its own random generators.
+    tcc::initialize_crypto_runtime();
+    tcc::initialize_crypto_runtime();
 }
 
 void exercise_measurements(const tcc::Algorithm id) {
@@ -40,6 +73,7 @@ void exercise_measurements(const tcc::Algorithm id) {
         "measured signing returned an empty signature");
     expect(signing.duration_ns >= 0, "signing duration is negative");
 
+    tcc::initialize_crypto_runtime();
     const tcc::TimedResult<bool> verification = tcc::measure_verification(
         *algorithm,
         payload,
@@ -68,6 +102,7 @@ void exercise_measurements(const tcc::Algorithm id) {
 int main() {
     try {
         static_assert(tcc::Timer::Clock::is_steady);
+        exercise_runtime_initialization();
         for (const tcc::Algorithm algorithm : tcc::algorithm_test_order) {
             exercise_measurements(algorithm);
         }

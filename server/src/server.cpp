@@ -197,6 +197,7 @@ RunSummary run(const ServerConfig& config) {
         throw ConfigError("output path must not be empty");
     }
 
+    initialize_crypto_runtime();
     Socket listener = create_listener();
     MeasurementCsvWriter writer(config.output_path);
     const std::uint64_t total =
