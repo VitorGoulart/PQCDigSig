@@ -40,6 +40,19 @@ endif()
 
 file(
     STRINGS
+    "${TCC_LIBOQS_ROOT}/include/oqs/common.h"
+    _tcc_oqs_preparation_api
+    REGEX "^OQS_API void OQS_TCC_init_shake256\\(void\\);"
+)
+if(NOT _tcc_oqs_preparation_api)
+    message(FATAL_ERROR
+        "liboqs is missing the project's SHAKE-256 preparation extension. "
+        "Rebuild it with tools/build-liboqs.sh for the current target."
+    )
+endif()
+
+file(
+    STRINGS
     "${TCC_OPENSSL_ROOT}/include/openssl/opensslv.h"
     _tcc_openssl_version_line
     REGEX "^#[ \t]*define[ \t]+OPENSSL_VERSION_STR[ \t]+\"3\\.5\\.7\""

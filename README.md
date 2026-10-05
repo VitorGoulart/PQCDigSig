@@ -112,7 +112,9 @@ ocultados e continuam sendo propagados como `CryptoError`.
 Antes das amostras, `tcc::initialize_crypto_runtime()` prepara o OpenSSL,
 mantém o provider `default` e as implementações criptográficas disponíveis,
 inicializa os geradores aleatórios da thread e chama `OQS_init()` para
-antecipar a detecção de recursos da CPU. A API está em
+antecipar a detecção de recursos da CPU. Também prepara o backend SHAKE-256
+da liboqs, inicializando e liberando um contexto vazio, sem absorver dados,
+finalizar, produzir saída ou consumir aleatoriedade. A API está em
 `tcc/crypto/runtime.hpp` e deve ser chamada na thread das medições. Ela pode
 ser chamada novamente sem gerar chaves, assinaturas ou amostras de aquecimento.
 O servidor conclui essa preparação antes de escutar; o Android a executa ao
@@ -123,6 +125,30 @@ Os cronômetros continuam abrangendo a chamada completa ao adaptador. Criação
 de contextos, alocação de buffers e importação/exportação de chaves continuam
 nesse intervalo; a preparação antecipa os custos compartilhados e por thread,
 sem eliminar todos os efeitos da primeira execução.
+
+O script `tools/build-liboqs.sh` aplica de forma idempotente o patch
+`tools/patches/liboqs-prepare-shake256.patch` à revisão fixada do submódulo.
+O patch expõe `OQS_TCC_init_shake256()` e mantém as funções SHA3 internas
+à dependência. A preparação é executada uma vez por processo; na configuração
+com pthreads, chamadas concorrentes são sincronizadas. Reconstrua a liboqs
+para Linux e para cada ABI Android antes de compilar a aplicação. O CMake
+rejeita instalações sem essa extensão. O submódulo permanece com alterações
+locais reproduzíveis pelo patch, sem trocar sua revisão.
+
+`tools/measure-falcon.cpp` mede dez repetições de uma variante por processo,
+com carga de 10 KiB, chaves novas e os cronômetros do núcleo. Os resultados
+são emitidos após as amostras; todas as assinaturas são verificadas e, ao
+final, uma carga adulterada é rejeitada. Exemplo no Linux:
+
+```bash
+clang++ -std=c++17 -O0 -g -I native/include tools/measure-falcon.cpp \
+  build/linux-debug/native/libtcc_native.a \
+  build/dependencies/linux/openssl/lib/libcrypto.a \
+  build/dependencies/linux/liboqs/lib/liboqs.a \
+  -ldl -pthread -o build/measure-falcon
+./build/measure-falcon 512
+./build/measure-falcon 1024
+```
 
 Em 19 de setembro de 2026, `measurement_test` percorreu os sete algoritmos,
 validando resultados e durações independentes para geração de chaves,

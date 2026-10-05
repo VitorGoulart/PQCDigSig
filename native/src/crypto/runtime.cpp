@@ -84,6 +84,9 @@ public:
         }
 
         OQS_init();
+        // liboqs keeps SHAKE dispatch separate from CPU detection. Prepare
+        // its empty context now, without hashing data or consuming randomness.
+        OQS_TCC_init_shake256();
     }
 
 private:

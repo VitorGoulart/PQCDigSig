@@ -25,7 +25,7 @@ void exercise_runtime_initialization() {
         tcc::initialize_crypto_runtime();
         tcc::initialize_crypto_runtime();
         const auto algorithm =
-            tcc::create_signature_algorithm(tcc::Algorithm::ed25519);
+            tcc::create_signature_algorithm(tcc::Algorithm::falcon_512);
         const auto keys = algorithm->generate_key_pair();
         const tcc::Bytes payload{'r', 'u', 'n', 't', 'i', 'm', 'e'};
         const auto signature = algorithm->sign(payload, keys.private_key);

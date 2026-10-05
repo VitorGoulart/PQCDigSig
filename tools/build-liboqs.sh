@@ -10,6 +10,7 @@ readonly minimum_android_api=29
 readonly target="${1:-}"
 readonly android_abi="${2:-arm64-v8a}"
 readonly algorithms="SIG_falcon_512;SIG_falcon_1024"
+readonly initialization_patch="${script_dir}/patches/liboqs-prepare-shake256.patch"
 
 usage() {
     echo "Usage: $0 <linux|android> [android-abi]" >&2
@@ -44,6 +45,7 @@ fi
 
 require_command cmake
 require_command ninja
+require_command git
 
 build_dir=""
 install_dir=""
@@ -82,6 +84,17 @@ case "${target}" in
         exit 2
         ;;
 esac
+
+# Keep the extension reproducible without changing the submodule revision.
+# Accept an already-applied patch; refuse incompatible local source changes.
+if git -C "${source_dir}" apply --reverse --check "${initialization_patch}" 2>/dev/null; then
+    echo "liboqs SHAKE-256 preparation patch already applied"
+elif git -C "${source_dir}" apply --check "${initialization_patch}"; then
+    git -C "${source_dir}" apply "${initialization_patch}"
+else
+    echo "Cannot apply the liboqs SHAKE-256 preparation patch." >&2
+    exit 1
+fi
 
 cmake -S "${source_dir}" -B "${build_dir}" \
     -G Ninja \
